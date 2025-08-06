@@ -1,69 +1,83 @@
 import cv2
 import numpy as np
 from video_stabilizer import VideoStabilizer
+import time
+import argparse
 
 def main():
-    # 创建视频稳定器对象
-    stabilizer = VideoStabilizer()
-    
-    # 初始化摄像头（0表示默认摄像头）
-    # cap = cv2.VideoCapture(0)
-    
-    # 也可以使用视频文件：
-    cap = cv2.VideoCapture(r'D:\pycharmproject\meshflow-master\videos\video-2\video-2.m4v')
-    
+    parser = argparse.ArgumentParser(description="Video Stabilization with Kalman Filter")
+    parser.add_argument('--feature_type', type=str, default='gftt', choices=['gftt', 'orb', 'sift'], help='Feature detection algorithm')
+    parser.add_argument('--input_path', type=str, default=r'D:\pycharmproject\meshflow-master\videos\video-2\video-2.m4v', help='Input video file path')
+    parser.add_argument('--output_path', type=str, default='stabilized_output_kalman.avi', help='Output stabilized video file path')
+    parser.add_argument('--show', type=bool,default=True, help='Show comparison window during processing')
+    parser.add_argument('--max_corners', type=int, default=200, help='Max corners for GFTT/ORB/SIFT')
+    parser.add_argument('--quality_level', type=float, default=0.01, help='Quality level for GFTT')
+    parser.add_argument('--min_distance', type=int, default=30, help='Min distance for GFTT')
+    args = parser.parse_args()
+
+    feature_type = args.feature_type
+    input_path = args.input_path
+    output_path = args.output_path
+    show = args.show
+    max_corners = args.max_corners
+    quality_level = args.quality_level
+    min_distance = args.min_distance
+
+    # Create stabilizer with feature_type
+    stabilizer = VideoStabilizer(feature_type=feature_type)
+    stabilizer.test = show
+    # Pass max_corners, quality_level, min_distance to stabilizer if needed
+    if hasattr(stabilizer, 'max_corners'):
+        stabilizer.max_corners = max_corners
+    if hasattr(stabilizer, 'quality_level'):
+        stabilizer.quality_level = quality_level
+    if hasattr(stabilizer, 'min_distance'):
+        stabilizer.min_distance = min_distance
+
+    cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
-        print("无法打开摄像头")
+        print(f"Cannot open video: {input_path}")
         return
-    
-    # 读取第一帧
     ret, frame_1 = cap.read()
     if not ret:
-        print("无法读取第一帧")
+        print("Cannot read the first frame")
         return
-    
-    # 设置输出视频
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter('stabilized_output_kalman.avi', fourcc, 30.0, 
-                         (frame_1.shape[1], frame_1.shape[0]))
-    
-    print("开始视频稳定化处理... 按 'q' 退出")
-    
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    print("Start video stabilization... Press 'q' to quit")
+    total_time = 0.0
+    frame_count = 0
     while True:
         try:
             ret, frame_2 = cap.read()
-            
             if not ret:
                 break
-            
-            # 进行视频稳定化
+            start_time = time.time()
             stabilized_frame = stabilizer.stabilize(frame_1, frame_2)
-            
-            # 写入输出视频
+            end_time = time.time()
+            total_time += (end_time - start_time)
+            frame_count += 1
             out.write(stabilized_frame)
-            
-            # # 显示稳定后的视频
-            # cv2.imshow("Stabled", stabilized_frame)
-            
-            # 按'q'退出
+            # Show stabilized video if requested
+            # if show:
+            #     cv2.imshow("Stabled", stabilized_frame)
             if cv2.waitKey(10) & 0xFF == ord('q'):
                 break
-            
-            # 更新帧
             frame_1 = frame_2.copy()
-            
         except Exception as e:
-            print(f"处理出错: {e}")
-            # 出错时重新读取帧
+            print(f"Error: {e}")
             ret, frame_1 = cap.read()
             if not ret:
                 break
-    
-    # 清理资源
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-    print("视频稳定化完成！")
+    print("Video stabilization finished!")
+    if frame_count > 0:
+        print(f"Average time per frame: {total_time / frame_count:.4f} s, total frames: {frame_count}")
 
 if __name__ == "__main__":
     main()

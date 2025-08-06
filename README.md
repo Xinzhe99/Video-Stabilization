@@ -52,6 +52,7 @@ pip install opencv-python numpy
 - **Batch video comparison** for algorithm evaluation
 - **Interactive GUI** for visual comparison and result export
 - **Easy integration** and extensibility for research and development
+- **Feature point detection algorithm selectable:** Supports 'gftt' (default), 'orb', 'sift', and can choose different feature point extraction methods based on requirements.
 
 ---
 
@@ -61,6 +62,7 @@ pip install opencv-python numpy
 - Single video stabilization demo
 - Supports webcam or local video file input
 - Outputs to `stabilized_output_kalman.avi`
+- **Feature type selectable:** Set `feature_type` to `'gftt'` (default), `'orb'`, or `'sift'` in the code to choose the feature detection algorithm.
 
 ### `video_stabilizer.py`
 - Core stabilization algorithm (feature tracking + affine + Kalman filter)
@@ -83,7 +85,14 @@ pip install opencv-python numpy
 ## 🚦 Usage
 
 ### 1. Single Video Stabilization
-Edit `main.py` to set your input video path, then run:
+Edit `main.py` to set your input video path and select the feature detection algorithm:
+
+```python
+feature_type = "gftt"  # Options: "gftt" (default), "orb", "sift"
+stabilizer = VideoStabilizer(feature_type=feature_type)
+```
+
+Then run:
 ```bash
 python main.py
 ```
@@ -123,3 +132,5 @@ A GUI will pop up. Add multiple videos, set the output path, and click "Start Co
 Feel free to submit Issues or Pull Requests for suggestions, bug reports, or contributions!
 
 ---
+
+*If you need a more detailed technical description or a Chinese version, please let me know!*
