@@ -123,5 +123,3 @@ A GUI will pop up. Add multiple videos, set the output path, and click "Start Co
 Feel free to submit Issues or Pull Requests for suggestions, bug reports, or contributions!
 
 ---
-
-*If you need a more detailed technical description or a Chinese version, please let me know!*
