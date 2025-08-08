@@ -10,6 +10,7 @@ def main():
     parser.add_argument('--input_path', type=str, default=r'D:\pycharmproject\meshflow-master\videos\video-2\video-2.m4v', help='Input video file path')
     parser.add_argument('--output_path', type=str, default='stabilized_output_kalman.avi', help='Output stabilized video file path')
     parser.add_argument('--show', type=bool,default=True, help='Show comparison window during processing')
+    parser.add_argument('--use_camera', action='store_true', help='Use camera instead of video file (default: use video file)')
     parser.add_argument('--max_corners', type=int, default=200, help='Max corners for GFTT/ORB/SIFT')
     parser.add_argument('--quality_level', type=float, default=0.01, help='Quality level for GFTT')
     parser.add_argument('--min_distance', type=int, default=30, help='Min distance for GFTT')
@@ -19,6 +20,7 @@ def main():
     input_path = args.input_path
     output_path = args.output_path
     show = args.show
+    use_camera = args.use_camera
     max_corners = args.max_corners
     quality_level = args.quality_level
     min_distance = args.min_distance
@@ -33,11 +35,22 @@ def main():
         stabilizer.quality_level = quality_level
     if hasattr(stabilizer, 'min_distance'):
         stabilizer.min_distance = min_distance
-
-    cap = cv2.VideoCapture(input_path)
+    
+    # Choose video source based on argument
+    if use_camera:
+        cap = cv2.VideoCapture(0)
+        print("Using camera as video source")
+    else:
+        cap = cv2.VideoCapture(input_path)
+        print(f"Using video file as source: {input_path}")
+    
     if not cap.isOpened():
-        print(f"Cannot open video: {input_path}")
+        if use_camera:
+            print("Cannot open camera")
+        else:
+            print(f"Cannot open video: {input_path}")
         return
+    
     ret, frame_1 = cap.read()
     if not ret:
         print("Cannot read the first frame")
