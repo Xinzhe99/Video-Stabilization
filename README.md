@@ -1,7 +1,7 @@
 # 🎬 Video Stabilization & Comparison Toolkit (Python Version)
 
 > **This project is a Python implementation of [Lakshya-Kejriwal/Real-Time-Video-Stabilization](https://github.com/Lakshya-Kejriwal/Real-Time-Video-Stabilization).**  
-> The original algorithm is described in the paper: [Real Time Video Stabilization Using Kalman Filter](https://www.sciencedirect.com/science/article/pii/S1877050916314624).
+> The original algorithm is described in the paper: [A Hybrid Filtering Approach of Digital Video Stabilization for UAV Using Kalman and Low Pass Filter](https://www.sciencedirect.com/science/article/pii/S1877050916314624).
 
 ---
 
@@ -132,5 +132,6 @@ A GUI will pop up. Add multiple videos, set the output path, and click "Start Co
 Feel free to submit Issues or Pull Requests for suggestions, bug reports, or contributions!
 
 ---
+
 
 *If you need a more detailed technical description or a Chinese version, please let me know!*
