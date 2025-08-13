@@ -7,13 +7,15 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(description="Video Stabilization with Kalman Filter")
     parser.add_argument('--feature_type', type=str, default='gftt', choices=['gftt', 'orb', 'sift'], help='Feature detection algorithm')
-    parser.add_argument('--input_path', type=str, default=r'D:\pycharmproject\meshflow-master\videos\video-2\video-2.m4v', help='Input video file path')
+    parser.add_argument('--input_path', type=str, default=r'C:\Users\xxz\Desktop\A001_08131429_C013.mov', help='Input video file path')
     parser.add_argument('--output_path', type=str, default='stabilized_output_kalman.avi', help='Output stabilized video file path')
     parser.add_argument('--show', type=bool,default=True, help='Show comparison window during processing')
     parser.add_argument('--use_camera', action='store_true', help='Use camera instead of video file (default: use video file)')
     parser.add_argument('--max_corners', type=int, default=200, help='Max corners for GFTT/ORB/SIFT')
     parser.add_argument('--quality_level', type=float, default=0.01, help='Quality level for GFTT')
     parser.add_argument('--min_distance', type=int, default=30, help='Min distance for GFTT')
+    parser.add_argument('--center_crop_ratio', type=float, default=1.3, help='Center crop ratio for removing black borders (1.0 = no crop, >1.0 = zoom in)')
+    parser.add_argument('--downsample_ratio', type=float, default=0.2, help='Downsample ratio for feature detection (0.5 = half resolution, 1.0 = full resolution)')
     args = parser.parse_args()
 
     feature_type = args.feature_type
@@ -24,9 +26,11 @@ def main():
     max_corners = args.max_corners
     quality_level = args.quality_level
     min_distance = args.min_distance
+    center_crop_ratio = args.center_crop_ratio
+    downsample_ratio = args.downsample_ratio
 
-    # Create stabilizer with feature_type
-    stabilizer = VideoStabilizer(feature_type=feature_type)
+    # Create stabilizer with feature_type, center_crop_ratio and downsample_ratio
+    stabilizer = VideoStabilizer(feature_type=feature_type, center_crop_ratio=center_crop_ratio, downsample_ratio=downsample_ratio)
     stabilizer.test = show
     # Pass max_corners, quality_level, min_distance to stabilizer if needed
     if hasattr(stabilizer, 'max_corners'):

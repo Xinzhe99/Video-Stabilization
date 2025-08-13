@@ -3,7 +3,7 @@ import numpy as np
 import math
 
 class VideoStabilizer:
-    def __init__(self, feature_type='gftt'):
+    def __init__(self, feature_type='gftt', center_crop_ratio=1.1, downsample_ratio=0.5):
         # 卡尔曼滤波器参数
         self.Q1 = 0.004  # 卡尔曼滤波器过程噪声Q的初始值，影响滤波器对新数据的敏感度
         self.R1 = 0.5    # 卡尔曼滤波器观测噪声R的初始值，影响滤波器对观测数据的信任度
@@ -13,6 +13,8 @@ class VideoStabilizer:
         
         # 边界裁剪参数
         self.HORIZONTAL_BORDER_CROP = 45  # 水平方向裁剪的像素数，用于去除变换后产生的黑边
+        self.center_crop_ratio = center_crop_ratio  # 中心放大比例，用于去除黑边（1.0=无放大，>1.0=放大）
+        self.downsample_ratio = downsample_ratio  # 下采样比例，用于加速特征检测（0.5=半分辨率，1.0=全分辨率）
         
         # 初始化帧计数器
         self.k = 1  # 当前处理的帧编号，第一帧不做滤波
@@ -67,18 +69,33 @@ class VideoStabilizer:
         h2, w2 = frame_2.shape[0], frame_2.shape[1]
         c2 = frame_2.shape[2] if len(frame_2.shape) > 2 else 1
 
+        # 下采样图像用于特征检测（如果downsample_ratio < 1.0）
+        if self.downsample_ratio < 1.0:
+            down_h1 = int(h1 * self.downsample_ratio)
+            down_w1 = int(w1 * self.downsample_ratio)
+            down_h2 = int(h2 * self.downsample_ratio)
+            down_w2 = int(w2 * self.downsample_ratio)
+            
+            frame1_gray_down = cv2.resize(frame1_gray, (down_w1, down_h1), interpolation=cv2.INTER_LINEAR)
+            frame2_gray_down = cv2.resize(frame2_gray, (down_w2, down_h2), interpolation=cv2.INTER_LINEAR)
+        else:
+            frame1_gray_down = frame1_gray
+            frame2_gray_down = frame2_gray
+            down_w1, down_h1 = w1, h1
+            down_w2, down_h2 = w2, h2
+
         # 计算垂直边界等比例地换算到垂直方向
         vert_border = int(self.HORIZONTAL_BORDER_CROP * h1 / w1)
         
-        # 特征点检测（根据 feature_type 选择）
+        # 特征点检测（根据 feature_type 选择，使用下采样图像）
         if self.feature_type == 'gftt':
-            features1 = cv2.goodFeaturesToTrack(frame1_gray, 
+            features1 = cv2.goodFeaturesToTrack(frame1_gray_down, 
                                                maxCorners=200, 
                                                qualityLevel=0.01, 
-                                               minDistance=30)
+                                               minDistance=int(30 * self.downsample_ratio))
         elif self.feature_type == 'orb':
             orb = cv2.ORB_create(nfeatures=200)
-            keypoints = orb.detect(frame1_gray, None)
+            keypoints = orb.detect(frame1_gray_down, None)
             if not keypoints:
                 features1 = None
             else:
@@ -88,7 +105,7 @@ class VideoStabilizer:
                 sift = cv2.SIFT_create(nfeatures=200)
             except AttributeError:
                 sift = cv2.xfeatures2d.SIFT_create(nfeatures=200)
-            keypoints = sift.detect(frame1_gray, None)
+            keypoints = sift.detect(frame1_gray_down, None)
             if not keypoints:
                 features1 = None
             else:
@@ -99,9 +116,9 @@ class VideoStabilizer:
         if features1 is None or len(features1) < 10:
             return frame_1
         
-        # 光流追踪
-        features2, status, err = cv2.calcOpticalFlowPyrLK(frame1_gray, 
-                                                          frame2_gray, 
+        # 光流追踪（使用下采样图像）
+        features2, status, err = cv2.calcOpticalFlowPyrLK(frame1_gray_down, 
+                                                          frame2_gray_down, 
                                                           features1, 
                                                           None)
         # print(features2.shape, status.shape) #(200, 1, 2) (200,)
@@ -121,6 +138,13 @@ class VideoStabilizer:
             good_features1 = np.array(good_features1, dtype=np.float32)
         if good_features2.dtype != np.float32:
             good_features2 = np.array(good_features2, dtype=np.float32)
+        
+        # 如果使用了下采样，需要将特征点坐标缩放回原分辨率
+        if self.downsample_ratio < 1.0:
+            scale_factor = 1.0 / self.downsample_ratio
+            good_features1 = good_features1 * scale_factor
+            good_features2 = good_features2 * scale_factor
+        
         # print(good_features1.shape, good_features2.shape)
         # 估计仿射变换
         try:
@@ -191,13 +215,23 @@ class VideoStabilizer:
         dy   = dy   + diff_trans_y  # 用平滑后的平移修正当前平移
         da   = da   + diff_theta    # 用平滑后的旋转修正当前旋转
         
+        # 应用中心放大比例
+        sx_scaled = sx * self.center_crop_ratio
+        sy_scaled = sy * self.center_crop_ratio
+        
+        # 计算中心偏移，确保放大后图像居中
+        center_x = w2 / 2.0
+        center_y = h2 / 2.0
+        dx_centered = dx + center_x * (1 - self.center_crop_ratio)
+        dy_centered = dy + center_y * (1 - self.center_crop_ratio)
+        
         # 创建平滑变换矩阵
-        self.smoothed_mat[0, 0] = sx * math.cos(da)        # 仿射矩阵第一行第一列，包含x缩放和旋转
-        self.smoothed_mat[0, 1] = sx * (-math.sin(da))     # 仿射矩阵第一行第二列，包含x缩放和旋转
-        self.smoothed_mat[1, 0] = sy * math.sin(da)        # 仿射矩阵第二行第一列，包含y缩放和旋转
-        self.smoothed_mat[1, 1] = sy * math.cos(da)        # 仿射矩阵第二行第二列，包含y缩放和旋转
-        self.smoothed_mat[0, 2] = dx                      # 仿射矩阵第一行第三列，x方向平移
-        self.smoothed_mat[1, 2] = dy                      # 仿射矩阵第二行第三列，y方向平移
+        self.smoothed_mat[0, 0] = sx_scaled * math.cos(da)        # 仿射矩阵第一行第一列，包含x缩放和旋转
+        self.smoothed_mat[0, 1] = sx_scaled * (-math.sin(da))     # 仿射矩阵第一行第二列，包含x缩放和旋转
+        self.smoothed_mat[1, 0] = sy_scaled * math.sin(da)        # 仿射矩阵第二行第一列，包含y缩放和旋转
+        self.smoothed_mat[1, 1] = sy_scaled * math.cos(da)        # 仿射矩阵第二行第二列，包含y缩放和旋转
+        self.smoothed_mat[0, 2] = dx_centered                     # 仿射矩阵第一行第三列，x方向平移（居中调整）
+        self.smoothed_mat[1, 2] = dy_centered                     # 仿射矩阵第二行第三列，y方向平移（居中调整）
         
         # 应用变换，指定更快的插值方式
         smoothed_frame = cv2.warpAffine(frame_1, self.smoothed_mat, (w2, h2), flags=cv2.INTER_LINEAR)
